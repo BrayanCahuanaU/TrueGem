@@ -1,0 +1,11 @@
+10-soles
+100-soles
+20-soles
+50-soles
+m1
+m10
+m2
+m20
+m5
+m50
+rev
