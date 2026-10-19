@@ -31,7 +31,7 @@ object Dinero {
 
     /** Devuelve (conteo por etiqueta, total en céntimos). */
     fun resumen(dets: List<Detection>, labels: List<String>): Pair<Map<String, Int>, Int> {
-        val conteo = dets.map { labels[it.cls] }
+        val conteo = dets.mapNotNull { labels.getOrNull(it.cls) }
             .filter { it in CENTIMOS }
             .groupingBy { it }
             .eachCount()
@@ -42,7 +42,9 @@ object Dinero {
 
 /**
  * Requiere en assets/: best.tflite y labels.txt (una clase por línea, en el orden de model.names).
- * Dependencia: implementation("org.tensorflow:tensorflow-lite:2.16.1")
+ * Dependencia: implementation("com.google.ai.edge.litert:litert:<última versión>").
+ * Ojo: el artefacto se llama com.google.ai.edge.litert:litert, pero la API Java sigue
+ * viviendo en el paquete org.tensorflow.lite (ver README, sección de decisiones).
  * En build.gradle.kts: android { androidResources { noCompress += "tflite" } }
  */
 class ModelRunner(context: Context, modelName: String = "best.tflite") {
@@ -60,6 +62,7 @@ class ModelRunner(context: Context, modelName: String = "best.tflite") {
         val fd = context.assets.openFd(modelName)
         val model = FileInputStream(fd.fileDescriptor).channel
             .map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
+        // TODO v2: delegado GPU (por ahora CPU con 4 hilos).
         interpreter = Interpreter(model, Interpreter.Options().setNumThreads(4))
         outShape = interpreter.getOutputTensor(0).shape()
         channelsFirst = outShape[1] < outShape[2]

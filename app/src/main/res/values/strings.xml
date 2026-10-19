@@ -1,3 +1,52 @@
 <resources>
-    <string name="app_name">TrueGem</string>
+    <string name="app_name">Reconocedor de dinero</string>
+
+    <!-- Inicio -->
+    <string name="home_scan">Reconocer dinero</string>
+    <string name="home_settings">Ajustes</string>
+    <string name="home_help">Ayuda</string>
+    <string name="home_offline">Funciona sin internet</string>
+    <string name="home_welcome">Reconocedor de dinero. Toque el botón grande para reconocer.</string>
+    <string name="home_no_voice">No hay servicio de voz instalado en este dispositivo. Los resultados se mostrarán en la pantalla.</string>
+
+    <!-- Reconocimiento -->
+    <string name="scan_title">Reconocer</string>
+    <string name="scan_instructions">Coloque el dinero sobre una superficie plana, a unos 30 centímetros del teléfono. Buscando.</string>
+    <string name="scan_searching">Buscando dinero…</string>
+    <string name="scan_detected">Dinero detectado</string>
+    <string name="scan_stop">Detener</string>
+    <string name="scan_timeout">No detecto dinero. Acerque o aleje un poco el teléfono y revise que haya luz.</string>
+    <string name="error_no_model">No se pudo iniciar el reconocimiento</string>
+    <string name="error_no_camera">Este dispositivo no tiene una cámara disponible.</string>
+    <string name="error_camera_start">No se pudo iniciar la cámara.</string>
+
+    <!-- Permiso de cámara -->
+    <string name="camera_needed">Necesito acceso a la cámara para reconocer el dinero que ponga delante.</string>
+    <string name="camera_denied">Sin permiso de cámara no puedo reconocer el dinero. Abra los ajustes de la aplicación para conceder el permiso.</string>
+    <string name="camera_open_settings">Abrir ajustes de la aplicación</string>
+
+    <!-- Resultado -->
+    <string name="result_title">Resultado</string>
+    <string name="result_total">Monto total</string>
+    <string name="result_empty">No se detectó dinero.</string>
+    <string name="result_repeat">Repetir mensaje</string>
+    <string name="result_scan_again">Escanear de nuevo</string>
+    <string name="quantity_format">× %1$d</string>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_voice_rate">Velocidad de voz</string>
+    <string name="settings_voice_volume">Volumen de voz</string>
+    <string name="settings_vibration">Vibración</string>
+    <string name="settings_beep">Señal sonora</string>
+    <string name="settings_test_voice">Probar voz</string>
+    <string name="settings_test_phrase">Total: 35 soles. Un billete de 20 soles, un billete de 10 soles, una moneda de 5 soles.</string>
+
+    <!-- Ayuda -->
+    <string name="help_title">Ayuda</string>
+    <string name="help_listen">Escuchar instrucciones</string>
+    <string name="help_body">Cómo reconocer el dinero:\n\n1. Toque el botón grande «Reconocer dinero» en la pantalla de inicio.\n\n2. Conceda el permiso de cámara la primera vez.\n\n3. Ponga los billetes y las monedas separados, sin superponerse, sobre una superficie plana y con buena luz.\n\n4. Sujete el teléfono unos 30 centímetros por encima, con la cámara trasera apuntando al dinero.\n\n5. Cuando la app reconozca el dinero, vibrará y le dirá el monto total automáticamente.\n\n6. En la pantalla de resultado, toque «Repetir mensaje» para volver a escuchar el total.\n\n7. Toque «Escanear de nuevo» para reconocer otro conjunto de dinero.\n\nTodos los ajustes de voz, vibración y señal sonora están en la pantalla de ajustes.</string>
+
+    <!-- Comunes -->
+    <string name="back">Atrás</string>
 </resources>

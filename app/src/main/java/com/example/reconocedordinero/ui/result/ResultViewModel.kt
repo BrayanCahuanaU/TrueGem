@@ -1,14 +1,20 @@
 package com.example.reconocedordinero.ui.result
 
 import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.reconocedordinero.AppContainer
+import com.example.reconocedordinero.domain.ScanResult
 import kotlinx.coroutines.flow.StateFlow
 
-data class ResultState(val totalCents: Int = 0, val counts: Map<String, Int> = emptyMap())
+/** Expone el resultado guardado en [AppContainer] (compartido entre pantallas). */
+class ResultViewModel(container: AppContainer) : ViewModel() {
 
-class ResultViewModel : ViewModel() {
-    private val _state = MutableStateFlow(ResultState())
-    val state: StateFlow<ResultState> = _state
+    val result: StateFlow<ScanResult?> = container.result
 
-    fun setResult(total: Int, counts: Map<String, Int>) { _state.value = ResultState(total, counts) }
+    companion object {
+        fun factory(container: AppContainer) = viewModelFactory {
+            initializer { ResultViewModel(container) }
+        }
+    }
 }

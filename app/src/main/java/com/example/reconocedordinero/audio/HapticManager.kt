@@ -4,20 +4,40 @@ import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 
-class HapticManager(private val context: Context) {
-    private val vib = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+/** Vibración con patrones distintos para inicio, éxito y error. Respeta el ajuste de vibración. */
+class HapticManager(context: Context, private val enabled: () -> Boolean) {
 
-    fun vibrateShort() {
-        if (!vib.hasVibrator()) return
-        val effect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE) else null
-        if (effect != null) vib.vibrate(effect) else vib.vibrate(50)
+    private val vibrator: Vibrator? = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }.getOrNull()
+
+    private fun oneShot(durationMs: Long) {
+        if (!enabled()) return
+        val v = vibrator ?: return
+        if (!v.hasVibrator()) return
+        v.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
-    fun vibrateSuccess() {
-        if (!vib.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) vib.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE)) else vib.vibrate(150)
+    private fun waveform(timings: LongArray) {
+        if (!enabled()) return
+        val v = vibrator ?: return
+        if (!v.hasVibrator()) return
+        v.vibrate(VibrationEffect.createWaveform(timings, -1))
     }
 
-    fun vibrateError() { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) vib.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE)) else vib.vibrate(300) }
+    /** Inicio de escaneo: una vibración corta. */
+    fun start() = oneShot(60)
+
+    /** Éxito: dos pulsos ascendentes. */
+    fun success() = waveform(longArrayOf(0, 80, 70, 140))
+
+    /** Error: tres pulsos. */
+    fun error() = waveform(longArrayOf(0, 120, 80, 120, 80, 220))
 }

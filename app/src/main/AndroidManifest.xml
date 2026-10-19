@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.reconocedordinero">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Permiso normal (sin diálogo) necesario para la vibración de inicio/éxito/error. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- La app funciona 100% sin internet: se eliminan permisos que arrastran
+         dependencias (Play Asset Delivery / WorkManager) y que no se usan. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+
     <uses-feature
-        android:name="android.hardware.camera"
-        android:required="true" />
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <!-- La app funciona 100% sin internet: no se declara el permiso INTERNET,
+         ni analítica ni telemetría. -->
 
     <application
         android:name="com.example.reconocedordinero.ReconocedorApp"
@@ -17,12 +31,14 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.TrueGem">
+        android:theme="@style/Theme.TrueGem"
+        tools:targetApi="34">
 
         <activity
             android:name="com.example.reconocedordinero.MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.TrueGem">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
