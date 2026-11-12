@@ -19,6 +19,7 @@ import com.example.reconocedordinero.ml.Dinero
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
 
 /** Estado visible de la pantalla de reconocimiento. */
 data class ScanUiState(
@@ -26,6 +27,8 @@ data class ScanUiState(
     val bitmapWidth: Int = 0,
     val bitmapHeight: Int = 0,
     val hasPieces: Boolean = false,
+    /** Monedas visibles que no se cuentan por no poder distinguir su denominación. */
+    val uncertainCount: Int = 0,
 )
 
 /**
@@ -46,6 +49,10 @@ class ScanViewModel(private val container: AppContainer) : ViewModel() {
 
     private var lastProcessedAt = 0L
     private var lastBeepAt = 0L
+    private var lastCaptureAt = 0L
+
+    /** Se vio al menos una moneda dudosa durante este escaneo (para el aviso de tiempo agotado). */
+    private var sawUncertain = false
 
     @Volatile
     private var finished = false
@@ -55,13 +62,18 @@ class ScanViewModel(private val container: AppContainer) : ViewModel() {
     fun bind(onResult: () -> Unit, onExit: () -> Unit) {
         this.onResult = onResult
         this.onExit = onExit
+        // Cada entrada a la pantalla empieza un escaneo limpio: sin pistas del anterior.
+        container.modelRunner?.resetTracks()
     }
 
     fun reset() {
         filter.reset()
         lastProcessedAt = 0L
         lastBeepAt = 0L
+        lastCaptureAt = 0L
+        sawUncertain = false
         finished = false
+        container.modelRunner?.resetTracks()
         _ui.value = ScanUiState()
     }
 
@@ -85,24 +97,30 @@ class ScanViewModel(private val container: AppContainer) : ViewModel() {
                 Log.e(TAG, "Fallo en la inferencia", e)
                 emptyList()
             }
+
+            capturarSiEstaActivo(bitmap, detections, model.labels, now)
             bitmap.recycle()
 
             val (counts, _) = Dinero.resumen(detections, model.labels)
+            val uncertain = Dinero.inciertas(detections, model.labels)
+            if (uncertain > 0) sawUncertain = true
             filter.push(counts)
 
+            val hayPiezas = counts.isNotEmpty() || uncertain > 0
             _ui.value = ScanUiState(
                 detections = detections.filter { model.labels.getOrNull(it.cls) in Dinero.CENTIMOS },
                 bitmapWidth = width,
                 bitmapHeight = height,
-                hasPieces = counts.isNotEmpty(),
+                hasPieces = hayPiezas,
+                uncertainCount = uncertain,
             )
 
-            if (counts.isNotEmpty() && now - lastBeepAt >= BEEP_INTERVAL_MS) {
+            if (hayPiezas && now - lastBeepAt >= BEEP_INTERVAL_MS) {
                 lastBeepAt = now
                 container.beepPlayer.beep()
             }
 
-            filter.getStable()?.let { estable -> finishWith(estable) }
+            filter.getStable()?.let { estable -> finishWith(estable, uncertain) }
         } catch (e: Exception) {
             Log.e(TAG, "No se pudo procesar el frame", e)
         } finally {
@@ -110,11 +128,34 @@ class ScanViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    private fun finishWith(counts: Map<String, Int>) {
+    /**
+     * Modo de captura para el dataset: guarda el fotograma y la predicción actual. Solo funciona
+     * en builds de depuración y si se activa por ADB (ver `CaptureStore`).
+     */
+    private fun capturarSiEstaActivo(
+        bitmap: Bitmap,
+        detections: List<Detection>,
+        labels: List<String>,
+        now: Long,
+    ) {
+        if (now - lastCaptureAt < CAPTURE_INTERVAL_MS) return
+        val capturas = container.captureStore
+        if (!capturas.enabled) return
+        lastCaptureAt = now
+        val prediccion = detections.joinToString(";") { d ->
+            val etiqueta = labels.getOrNull(d.cls) ?: d.cls.toString()
+            String.format(Locale.US, "%s=%.2f", etiqueta, d.score)
+        }
+        capturas.save(bitmap, prediccion)
+    }
+
+    private fun finishWith(counts: Map<String, Int>, uncertainCoins: Int) {
         if (finished) return
         finished = true
         val total = counts.entries.sumOf { (Dinero.CENTIMOS[it.key] ?: 0) * it.value }
-        container.publishResult(ScanResult(counts = counts, totalCents = total))
+        container.publishResult(
+            ScanResult(counts = counts, totalCents = total, uncertainCoins = uncertainCoins),
+        )
         container.hapticManager.success()
         mainHandler.post { onResult?.invoke() }
     }
@@ -124,7 +165,13 @@ class ScanViewModel(private val container: AppContainer) : ViewModel() {
         if (finished) return
         finished = true
         container.hapticManager.error()
-        container.speechManager.speak(container.context.getString(R.string.scan_timeout))
+        // Si se vieron monedas dudosas, el aviso es más útil que «no detecto dinero».
+        val mensaje = if (sawUncertain) {
+            R.string.scan_uncertain_timeout
+        } else {
+            R.string.scan_timeout
+        }
+        container.speechManager.speak(container.context.getString(mensaje))
         mainHandler.post { onExit?.invoke() }
     }
 
@@ -132,6 +179,7 @@ class ScanViewModel(private val container: AppContainer) : ViewModel() {
         private const val TAG = "ScanViewModel"
         private const val FRAME_INTERVAL_MS = 200L
         private const val BEEP_INTERVAL_MS = 1500L
+        private const val CAPTURE_INTERVAL_MS = 800L
 
         fun factory(container: AppContainer) = viewModelFactory {
             initializer { ScanViewModel(container) }

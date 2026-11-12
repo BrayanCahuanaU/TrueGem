@@ -15,7 +15,9 @@
     <string name="scan_searching">Buscando dinero…</string>
     <string name="scan_detected">Dinero detectado</string>
     <string name="scan_stop">Detener</string>
+    <string name="scan_uncertain_hint">Una moneda no se distingue con seguridad. Sepárelas un poco.</string>
     <string name="scan_timeout">No detecto dinero. Acerque o aleje un poco el teléfono y revise que haya luz.</string>
+    <string name="scan_uncertain_timeout">Vi una moneda pero no pude reconocer su valor con seguridad. Sepárelas un poco, acérquese y vuelva a intentarlo.</string>
     <string name="error_no_model">No se pudo iniciar el reconocimiento</string>
     <string name="error_no_camera">Este dispositivo no tiene una cámara disponible.</string>
     <string name="error_camera_start">No se pudo iniciar la cámara.</string>
@@ -31,6 +33,7 @@
     <string name="result_empty">No se detectó dinero.</string>
     <string name="result_repeat">Repetir mensaje</string>
     <string name="result_scan_again">Escanear de nuevo</string>
+    <string name="result_uncertain_coins">No pude reconocer una moneda con seguridad, así que no la conté. Sepárelas un poco y vuelva a intentarlo.</string>
     <string name="quantity_format">× %1$d</string>
 
     <!-- Ajustes -->

@@ -13,6 +13,8 @@ físicos. Funciona **100 % sin internet**.
 - Reconoce **billetes de 10, 20, 50 y 100 soles**.
 - Reconoce **monedas de 1, 2 y 5 soles**, y de **10, 20 y 50 céntimos**.
 - Cuenta cuántas piezas hay de cada tipo y calcula el **monto total**.
+- Si no puede distinguir una moneda con seguridad, **no la cuenta** y lo avisa, para no dar un
+  total equivocado.
 - Lee el resultado en voz alta, con el total y el detalle pieza por pieza.
 - Avisa con **señal sonora** mientras ve dinero y con **vibración** al empezar, acertar o fallar.
 - Guarda los ajustes de voz, vibración y navegación en el propio teléfono.
@@ -68,16 +70,50 @@ En palabras simples:
 1. **CameraX** entrega fotogramas de la cámara. Para ahorrar batería se procesan como máximo
    **5 por segundo**.
 2. Cada fotograma se convierte en una imagen y se pasa a un **modelo de detección de objetos
-   tipo YOLO** (`best.tflite`, 640 × 640, ejecutado en CPU con 4 hilos). El modelo devuelve
-   cajas con la clase y la confianza de cada pieza.
-3. Las detecciones se **cuentan por denominación**. Los importes se manejan en **céntimos
+   tipo YOLO** (`best.tflite`, ejecutado en CPU con 4 hilos). El modelo devuelve muchas cajas
+   candidatas, cada una con su clase y su confianza. El tamaño de entrada se lee del propio
+   modelo (hoy 640 × 640), no está fijado en el código.
+3. Las detecciones se **limpian antes de contar** (ver [4.1](#41-cómo-se-decide-qué-es-cada-pieza)):
+   una sola caja por objeto, umbral de confianza según la denominación, recorte ampliado de las
+   monedas, voto entre fotogramas y descarte de monedas dudosas.
+4. Las detecciones se **cuentan por denominación**. Los importes se manejan en **céntimos
    enteros**, nunca en decimales, para que las sumas sean exactas.
-4. Un **filtro de estabilidad** evita resultados precipitados: guarda el conteo de los últimos
+5. Un **filtro de estabilidad** evita resultados precipitados: guarda el conteo de los últimos
    8 fotogramas y solo da el resultado por bueno cuando el mismo conteo aparece en al menos 5
    y hay al menos una pieza.
-5. Al estabilizarse, se guarda el resultado, **vibra**, se navega a la pantalla de resultado y
+6. Al estabilizarse, se guarda el resultado, **vibra**, se navega a la pantalla de resultado y
    se lee el total con el detalle.
-6. Mientras hay piezas a la vista suena una **señal sonora** como máximo cada 1,5 segundos.
+7. Mientras hay piezas a la vista suena una **señal sonora** como máximo cada 1,5 segundos.
+
+### 4.1 Cómo se decide qué es cada pieza
+
+Las monedas peruanas se parecen mucho entre sí y el modelo a veces duda entre dos
+denominaciones para la misma pieza. Para no contar de más ni contar mal, la app aplica cinco
+reglas:
+
+1. **Una caja por objeto.** Si el modelo propone dos cajas solapadas para la misma moneda con
+   clases distintas (por ejemplo 20 céntimos al 60 % y 50 céntimos al 55 %), se queda solo con
+   la más segura. Así una moneda nunca se cuenta dos veces como dos denominaciones.
+2. **Umbral según la denominación.** Las monedas de 10, 20 y 50 céntimos exigen un 50 % de
+   confianza; las de 1, 2 y 5 soles, un 45 %; los billetes mantienen el 40 %, porque ya
+   funcionan bien y no conviene perder detecciones.
+3. **No contar dudas.** Si la clase ganadora y la segunda están a menos de un 15 % de distancia,
+   la moneda se considera dudosa: **no suma al total**. La app lo avisa en la pantalla de
+   resultado y por voz («No pude reconocer una moneda con seguridad…»), y si la duda impide
+   estabilizar el conteo, el aviso de los 20 segundos también lo explica.
+4. **Recorte ampliado.** Cuando una moneda ocupa pocos píxeles en el fotograma completo, la app
+   recorta esa zona con un 20 % de margen y la vuelve a pasar por el modelo. Así la pieza ocupa
+   casi todo el tensor de entrada y se aprecian el número, el relieve y el canto. La lectura del
+   recorte se mezcla con la del fotograma completo, dando más peso al recorte. Para no gastar
+   batería se hacen como máximo **3 recortes por fotograma**, priorizando las monedas más
+   seguras.
+5. **Voto temporal.** Cada moneda se sigue entre fotogramas por solapamiento de su caja (IoU) y
+   se van acumulando sus probabilidades. Una predicción aislada y errónea pesa menos que la
+   evidencia de varios fotogramas seguidos. Si una moneda sigue dudosa tras varios fotogramas,
+   se vuelve a recortar de vez en cuando para confirmar la lectura.
+
+Los billetes están exentos de las reglas de duda, recorte y voto temporal: se cuentan siempre que
+superen su umbral, con la misma lógica que antes. Así no se pierde lo que ya funcionaba bien.
 
 Detalles que ayudan a entender el comportamiento:
 
@@ -147,6 +183,10 @@ supondría un servicio permanente en segundo plano; el modo queda contenido dent
 - Los fotogramas de la cámara se procesan **en memoria** y se descartan; no se guardan ni se
   envían.
 - Lo único que se guarda en el teléfono son los ajustes (voz, vibración, señal y navegación).
+- **Excepción voluntaria:** el modo de captura para mejorar el modelo (sección
+  [14](#14-modo-de-captura-para-mejorar-el-modelo)) guarda fotogramas en el teléfono, pero solo
+  existe en compilaciones de depuración, hay que activarlo a mano por ADB y nunca se sube nada a
+  internet. La versión de release que se instala normalmente no incluye esa función activa.
 
 ## 8. Requisitos
 
@@ -173,7 +213,8 @@ app/src/main/
 │   │   ├── HapticManager.kt     Patrones de vibración (paso, inicio, éxito, error)
 │   │   └── BeepPlayer.kt        Pitido mientras se detecta dinero
 │   ├── data/
-│   │   └── SettingsRepository.kt  Ajustes guardados con DataStore
+│   │   ├── SettingsRepository.kt  Ajustes guardados con DataStore
+│   │   └── CaptureStore.kt        Modo de captura de imágenes para el dataset (solo debug)
 │   ├── domain/
 │   │   ├── ScanResult.kt        Resultado: conteo por pieza y total en céntimos
 │   │   ├── MoneyFormatter.kt    Montos en texto y frases habladas en español
@@ -213,6 +254,8 @@ Las pruebas unitarias cubren:
 - `StabilityFilterTest`: cuándo un conteo se considera estable.
 - `MoneyFormatterTest`: montos, singular/plural y frases habladas.
 - `CursorControllerTest`: avance circular, modo ajuste y reinicio al cambiar de pantalla.
+- `ModelRunnerTest`: NMS entre clases, margen de duda, conteo de monedas dudosas, `top2` y mezcla
+  de probabilidades del recorte ampliado.
 
 ## 11. El modelo `best.tflite`
 
@@ -261,20 +304,105 @@ guardados) y luego instalar la nueva.
 ## 13. Logcat
 
 Filtrar por la etiqueta `ModelRunner`. Al arrancar el reconocimiento imprime las formas reales
-del modelo:
+del modelo y el tamaño de entrada que va a usar:
 
 ```
-ModelRunner: in=[1, 3, 640, 640] out=[1, 15, 8400]
+ModelRunner: in=[1, 3, 640, 640] out=[1, 15, 8400] entrada=640x640
 ```
 
 La salida esperada es `[1, 15, 8400]`; la entrada puede ser `[1, 3, 640, 640]` o
-`[1, 640, 640, 3]`. `ModelRunner` detecta automáticamente el orden de canales y si las
-coordenadas vienen normalizadas.
+`[1, 640, 640, 3]`. `ModelRunner` detecta automáticamente el orden de canales, el tamaño de
+entrada y si las coordenadas vienen normalizadas.
+
+Para ver **cada detección** (clase, confianza, segunda clase, margen y caja) hay que habilitar
+el nivel DEBUG de la etiqueta en el teléfono:
+
+```bash
+adb shell setprop log.tag.ModelRunner DEBUG
+```
+
+Los mensajes se ven así:
+
+```
+ModelRunner: m20=0.62 segunda=0.31 margen=0.31 caja=[410,300,520,410]
+ModelRunner: m10=0.48 segunda=0.44 margen=0.04 DUDOSA caja=[120,310,210,400]
+ModelRunner: recorte 240x240: m20 -> m50 (recorte=0.71)
+```
+
+`DUDOSA` significa que la moneda no se contó por tener un margen menor que 0,15. Es la forma más
+rápida de comprobar si el problema es de duplicados, de umbral o de sesgo del modelo. La línea
+`recorte` muestra el tamaño del recorte ampliado y cómo cambió la clase al re-evaluar la moneda;
+si aparece a menudo cambiando la denominación, el modelo está confundiendo esa pareja de clases y
+hará falta más datos reales. El `setprop` se pierde al reiniciar el teléfono.
 
 Otras etiquetas útiles: `AppContainer` (fallo al cargar el modelo), `SpeechManager` (motor de
-voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia) y `ButtonNavigation` (pasos del cursor).
+voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia), `ButtonNavigation` (pasos del cursor) y
+`CaptureStore` (modo de captura).
 
-## 14. Decisiones ante ambigüedades
+## 14. Modo de captura para mejorar el modelo
+
+El modelo incluido reconoce bien los billetes, pero confunde algunas monedas porque el dataset
+público con el que se entrenó tiene **muchas menos monedas que billetes** (ver
+`PLAN_MEJORA_MONEDAS.md`). Para mejorarlo hacen falta fotos reales del teléfono. La app incluye un
+modo de captura que guarda los fotogramas que analiza, **solo en compilaciones de depuración** y
+**sin enviar nada a internet**.
+
+### 14.1 Activar el modo
+
+La forma recomendada es lanzar la app con un extra de intent (no necesita permisos especiales):
+
+```bash
+adb shell am force-stop com.example.reconocedordinero
+adb shell am start -n com.example.reconocedordinero/.MainActivity --ez capturar true
+```
+
+En algunos teléfonos el usuario `shell` no puede escribir ajustes globales
+(`SecurityException: WRITE_SECURE_SETTINGS`). Para esos casos existe la alternativa del ajuste
+global, si el dispositivo lo permite:
+
+```bash
+adb shell settings put global truegem_capturas 1
+# desactivar: adb shell settings put global truegem_capturas 0
+```
+
+Al activarse, Logcat muestra:
+
+```
+CaptureStore: Capturas activadas en /storage/emulated/0/Android/data/com.example.reconocedordinero/files/capturas
+MainActivity: Modo de captura activado por intent
+```
+
+El modo se desactiva al cerrar la app (`force-stop` o quitar de recientes).
+
+### 14.2 Qué guarda
+
+- Un JPEG por fotograma, como máximo **uno cada 800 ms** y **500 capturas** por sesión.
+- `predicciones.csv` con el nombre de la imagen y la predicción de la app en ese momento
+  (etiqueta y confianza de cada pieza). Sirve como punto de partida para etiquetar, pero **hay
+  que revisarlo**: el propio modelo es el que se quiere corregir.
+- Las imágenes quedan en el almacenamiento externo propio de la app, accesible sin root.
+
+### 14.3 Extraer las capturas
+
+```bash
+adb pull /sdcard/Android/data/com.example.reconocedordinero/files/capturas
+```
+
+Después se etiquetan (por ejemplo en Roboflow) y se añaden al entrenamiento. Conviene capturar,
+como mínimo:
+
+1. Una moneda por denominación, por ambas caras.
+2. Varias monedas juntas, separadas y ligeramente solapadas.
+3. Monedas junto a billetes.
+4. Mesa clara, mesa oscura, mantel con textura y mano cerca.
+5. Luz natural, luz cálida, sombra y brillo directo.
+6. Distancias de 20, 30 y 40 cm, y distintos ángulos.
+7. Monedas parcialmente tapadas o en el borde del encuadre.
+
+Las capturas se borran desinstalando la app o eliminando la carpeta. No se comparten ni se suben
+automáticamente.
+
+## 15. Decisiones ante ambigüedades
 
 - **LiteRT y el import de `Interpreter`.** La dependencia es
   `com.google.ai.edge.litert:litert:2.3.0` (Google Maven), como pide el enunciado. En esa
@@ -304,11 +432,23 @@ voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia) y `ButtonNavigation` (
 - **Pruebas de plantilla** (`ExampleUnitTest.java` / `ExampleInstrumentedTest.java`, del paquete
   `com.example.truegem`) se eliminaron porque no correspondían a este proyecto.
 
-## 15. Problemas frecuentes
+- **Recorte y voto temporal solo para monedas.** Los billetes se procesan como antes. El recorte
+  se hace con 20 % de margen y se mezcla con la lectura completa (65 % recorte, 35 % completa);
+  para acotar el coste se limitan a 3 recortes por fotograma y el seguimiento temporal olvida las
+  pistas que llevan más de 12 fotogramas sin verse. Todo el estado de seguimiento se reinicia al
+  empezar un escaneo (`resetTracks`).
+- **Modo de captura.** `CaptureStore` solo se activa en builds `debug` y por un extra de intent
+  (`--ez capturar true`) o por el ajuste global `truegem_capturas`. Se eligió el extra de intent
+  porque en algunos teléfonos el usuario `shell` no tiene `WRITE_SECURE_SETTINGS`. Las capturas
+  van al almacenamiento externo propio de la app para poder extraerlas con `adb pull` sin root.
+
+## 16. Problemas frecuentes
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | No reconoce nada y vuelve al inicio | Poca luz, piezas juntas o demasiada distancia | Buena luz, separar las piezas y mantener el teléfono a unos 30 cm y quieto. |
+| Dice «No pude reconocer una moneda con seguridad» | El modelo duda entre dos denominaciones parecidas | Es intencionado: la moneda no se cuenta para no dar un total equivocado. Separar las monedas, acercarse y repetir. |
+| Confunde siempre la misma moneda (p. ej. 20 céntimos → 50 céntimos) | El dataset tiene muy pocas monedas comparado con los billetes y el modelo tiende a la clase más frecuente | Es un límite del modelo, no de los umbrales. Capturar imágenes reales con el modo de captura (sección [14](#14-modo-de-captura-para-mejorar-el-modelo)) y reentrenar. |
 | Dice «No se pudo iniciar el reconocimiento» | Falta `best.tflite` o `labels.txt` está mal | Revisar `app/src/main/assets/` y el orden de las clases. |
 | No habla | No hay voz en español instalada, o el volumen de voz está a 0 | Instalar una voz en español y subir «Volumen de voz» en Ajustes. |
 | Los botones de volumen no navegan | Modo desactivado, TalkBack activo o pantalla sin elementos | Activar «Navegación con botones» en Ajustes y desactivar TalkBack. |
@@ -316,7 +456,7 @@ voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia) y `ButtonNavigation` (
 | Aparece un borde amarillo | Es el cursor de la navegación por botones | Normal; se oculta al desactivar el modo en Ajustes. |
 | No instala la nueva versión | Firma distinta de la app instalada | Desinstalar la versión anterior e instalar de nuevo. |
 
-## 16. Fuera de alcance (v2)
+## 17. Fuera de alcance (v2)
 
 Linterna automática, detección de imagen borrosa, delegado GPU, modo claro, otros idiomas,
 detección de piezas de 5 céntimos o billetes de 200 soles (el modelo no tiene esas clases).

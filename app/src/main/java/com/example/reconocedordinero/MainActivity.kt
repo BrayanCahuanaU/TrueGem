@@ -1,6 +1,7 @@
 package com.example.reconocedordinero
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         container = (application as ReconocedorApp).container
+        aplicarModoCaptura(intent)
         setContent {
             ReconocedorTheme {
                 Surface(
@@ -89,6 +91,23 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        aplicarModoCaptura(intent)
+    }
+
+    /**
+     * Modo de captura para el dataset, solo en builds de depuración:
+     * `adb shell am start -n <paquete>/.MainActivity --ez capturar true`.
+     */
+    private fun aplicarModoCaptura(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_CAPTURAR, false) == true) {
+            container.captureStore.forzado = true
+            Log.i("MainActivity", "Modo de captura activado por intent")
         }
     }
 
@@ -201,6 +220,7 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val TAG = "ButtonNavigation"
+        const val EXTRA_CAPTURAR = "capturar"
     }
 }
 

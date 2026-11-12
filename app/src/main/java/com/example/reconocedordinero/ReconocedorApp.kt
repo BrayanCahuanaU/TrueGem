@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.reconocedordinero.audio.BeepPlayer
 import com.example.reconocedordinero.audio.HapticManager
 import com.example.reconocedordinero.audio.SpeechManager
+import com.example.reconocedordinero.data.CaptureStore
 import com.example.reconocedordinero.data.SettingsRepository
 import com.example.reconocedordinero.domain.ScanResult
 import com.example.reconocedordinero.ml.ModelRunner
@@ -35,6 +36,9 @@ class AppContainer(val context: Application) {
     val speechManager: SpeechManager by lazy { SpeechManager(context) { settings.value } }
     val hapticManager: HapticManager by lazy { HapticManager(context) { settings.value.vibration } }
     val beepPlayer: BeepPlayer by lazy { BeepPlayer { settings.value.beep } }
+
+    /** Captura de fotogramas reales para el dataset, solo en debug y activada por ADB. */
+    val captureStore: CaptureStore by lazy { CaptureStore(context) }
 
     /**
      * Un único hilo dedicado para TODA la inferencia: `ModelRunner` no es seguro entre hilos
