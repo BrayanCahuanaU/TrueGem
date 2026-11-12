@@ -30,6 +30,10 @@ class SettingsViewModel(private val repository: SettingsRepository) : ViewModel(
         viewModelScope.launch { repository.setBeep(value) }
     }
 
+    fun setButtonNavigation(value: Boolean) {
+        viewModelScope.launch { repository.setButtonNavigation(value) }
+    }
+
     companion object {
         fun factory(repository: SettingsRepository) = viewModelFactory {
             initializer { SettingsViewModel(repository) }

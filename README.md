@@ -1,11 +1,203 @@
 # Reconocedor de dinero
 
-App Android (Kotlin + Jetpack Compose, Material 3) para reconocer billetes y monedas peruanas
-con la cámara, contar cada denominación y decir el monto total en voz alta. Está pensada para
-personas ciegas o con baja visión: todo el flujo se completa con TalkBack, voz, vibración y
-señal sonora. Funciona 100% sin internet.
+App Android para reconocer billetes y monedas peruanas con la cámara, contar cada denominación
+y decir el monto total en voz alta. Está pensada para personas ciegas o con baja visión: todo el
+flujo se puede completar sin mirar la pantalla, con voz, vibración, señal sonora y botones
+físicos. Funciona **100 % sin internet**.
 
-## 1. Abrir y compilar
+> **En una frase:** apunta la cámara al dinero, la app lo detecta, cuenta las piezas y te dice
+> «Total: 35 soles. Un billete de 20 soles, un billete de 10 soles, una moneda de 5 soles».
+
+## 1. Qué hace
+
+- Reconoce **billetes de 10, 20, 50 y 100 soles**.
+- Reconoce **monedas de 1, 2 y 5 soles**, y de **10, 20 y 50 céntimos**.
+- Cuenta cuántas piezas hay de cada tipo y calcula el **monto total**.
+- Lee el resultado en voz alta, con el total y el detalle pieza por pieza.
+- Avisa con **señal sonora** mientras ve dinero y con **vibración** al empezar, acertar o fallar.
+- Guarda los ajustes de voz, vibración y navegación en el propio teléfono.
+- No usa internet, ni cuentas, ni publicidad, ni analítica.
+
+## 2. Cómo se usa (paso a paso)
+
+1. **Abre la app.** Escucharás un saludo y verás un botón grande: «Reconocer dinero».
+2. **Toca el botón grande.** La primera vez, la app explica por voz para qué necesita la cámara
+   y pide el permiso.
+3. **Coloca el dinero** sobre una superficie plana, con buena luz, sin que las piezas se
+   superpongan.
+4. **Sujeta el teléfono unos 30 cm por encima**, con la cámara trasera apuntando al dinero.
+5. Mientras ve dinero, la app **pita** de vez en cuando y muestra las detecciones en pantalla.
+6. Cuando el conteo se mantiene estable durante unos instantes, **vibra**, pasa a la pantalla de
+   resultado y **dice el total y el detalle en voz alta**.
+7. En el resultado puedes **repetir el mensaje** o **escanear de nuevo**.
+8. Si pasan **20 segundos sin un resultado estable**, la app avisa por voz («No detecto
+   dinero…») y vuelve al inicio.
+
+No hace falta tocar los controles directamente: con la navegación por botones (activada por
+defecto) puedes recorrer cada pantalla con los botones de volumen. Lo explico en la
+sección [6.1](#61-navegación-con-botones-físicos).
+
+## 3. Las pantallas
+
+| Pantalla | Qué muestra | Qué puedes hacer |
+|---|---|---|
+| **Inicio** | Botón grande «Reconocer dinero», accesos a Ajustes y Ayuda, aviso de que funciona sin internet y aviso si el teléfono no tiene voz instalada. | Empezar un reconocimiento o entrar a Ajustes/Ayuda. |
+| **Reconocer** | Vista de la cámara, recuadros sobre el dinero detectado, tarjeta de estado («Buscando dinero…» / «Dinero detectado») y botón «Detener». | Apuntar al dinero o detener y volver. |
+| **Resultado** | Monto total, lista de piezas con su cantidad, botones «Repetir mensaje» y «Escanear de nuevo». | Volver a oír el total o empezar otro escaneo. |
+| **Ajustes** | Velocidad y volumen de la voz, vibración, señal sonora, navegación con botones y «Probar voz». | Cambiar cómo habla y avisa la app. Se guarda al instante. |
+| **Ayuda** | Instrucciones escritas paso a paso y botón «Escuchar instrucciones». | Leer o escuchar cómo usar la app. |
+
+## 4. Cómo funciona por dentro (sin leer el código)
+
+La app no «manda» la foto a ningún servidor: todo el reconocimiento ocurre en el teléfono.
+
+```
+Cámara ──► fotogramas (~5 por segundo) ──► modelo de detección ──► piezas detectadas
+                                                                        │
+                                                        conteo por denominación
+                                                                        │
+                                              filtro de estabilidad ◄────┘
+                                                        │
+                                     (mismo conteo en 5 de los últimos 8 fotogramas)
+                                                        ▼
+                                   resultado + vibración + voz + pantalla de resultado
+```
+
+En palabras simples:
+
+1. **CameraX** entrega fotogramas de la cámara. Para ahorrar batería se procesan como máximo
+   **5 por segundo**.
+2. Cada fotograma se convierte en una imagen y se pasa a un **modelo de detección de objetos
+   tipo YOLO** (`best.tflite`, 640 × 640, ejecutado en CPU con 4 hilos). El modelo devuelve
+   cajas con la clase y la confianza de cada pieza.
+3. Las detecciones se **cuentan por denominación**. Los importes se manejan en **céntimos
+   enteros**, nunca en decimales, para que las sumas sean exactas.
+4. Un **filtro de estabilidad** evita resultados precipitados: guarda el conteo de los últimos
+   8 fotogramas y solo da el resultado por bueno cuando el mismo conteo aparece en al menos 5
+   y hay al menos una pieza.
+5. Al estabilizarse, se guarda el resultado, **vibra**, se navega a la pantalla de resultado y
+   se lee el total con el detalle.
+6. Mientras hay piezas a la vista suena una **señal sonora** como máximo cada 1,5 segundos.
+
+Detalles que ayudan a entender el comportamiento:
+
+- La pantalla se mantiene encendida **solo durante el reconocimiento**.
+- Toda la inferencia pasa por **un único hilo**, porque el modelo no es seguro entre hilos.
+- Si el modelo falta o está dañado, la app **no se cierra**: avisa por voz y en pantalla.
+- El resultado se comparte entre pantallas en memoria (no se pasa como argumento de navegación).
+
+## 5. Ajustes
+
+Los ajustes se aplican al instante y se guardan en el teléfono (DataStore).
+
+| Ajuste | Valores | Para qué sirve |
+|---|---|---|
+| **Velocidad de voz** | 0,5 a 2,0 veces (por defecto 1,0) | Hablar más despacio o más rápido. |
+| **Volumen de voz** | 0 a 100 % (por defecto 80) | Volumen propio de la voz de la app, independiente del volumen del sistema. |
+| **Vibración** | Activada / desactivada (por defecto activada) | Vibración al empezar, al acertar, al fallar y al mover el cursor. |
+| **Señal sonora** | Activada / desactivada (por defecto activada) | Pitido breve mientras la cámara ve dinero. |
+| **Navegación con botones** | Activada / desactivada (por defecto activada) | Usar los botones de volumen para recorrer la pantalla. |
+| **Probar voz** | Botón | Lee una frase de ejemplo con la velocidad y el volumen actuales. |
+
+## 6. Accesibilidad
+
+- Todo el texto está en `strings.xml` (español) y los botones tienen descripción para TalkBack.
+- Los títulos se anuncian como encabezados y el orden de foco es lógico.
+- El diseño admite **texto grande** (hasta 200 %) con desplazamiento vertical en Resultado,
+  Ajustes y Ayuda.
+- Los deslizadores anuncian su valor («1,2 veces», «80 por ciento»).
+- Cada paso del cursor da una **vibración muy corta**, para no depender de esperar a la voz.
+- La app avisa por voz de los errores importantes: falta de cámara, permiso denegado, modelo
+  no disponible, tiempo agotado.
+
+### 6.1 Navegación con botones físicos
+
+En **Ajustes → Navegación con botones** (activada por defecto) se puede recorrer cada pantalla
+sin tocar directamente los controles:
+
+- **Volumen arriba**: elemento anterior.
+- **Volumen abajo**: elemento siguiente.
+- **Un toque en cualquier parte de la pantalla**: selecciona el elemento resaltado.
+- **Dos toques**: vuelve a la pantalla anterior.
+
+El elemento actual se marca con un borde amarillo y se anuncia por voz con su nombre, su valor
+y su posición («Velocidad de voz: 1,0 veces. 1 de 6»). En los deslizadores de velocidad y volumen
+de voz, un toque entra en **modo ajuste**: los botones de volumen cambian el valor y otro toque
+sale del modo.
+
+El **botón de encendido no se puede interceptar** en Android: el sistema lo consume antes de que
+llegue a la aplicación y apaga la pantalla. La app solo puede usar los botones de volumen. Si
+algún dispositivo entrega `KEYCODE_POWER`, se trata como «siguiente», pero no es lo habitual.
+
+Con **TalkBack activo**, este modo se desactiva automáticamente para no interferir con la
+exploración táctil y los gestos de TalkBack. También se puede desactivar a mano en Ajustes; al
+desactivarlo, los botones de volumen vuelven a controlar el volumen del sistema y los toques
+funcionan de la forma normal.
+
+Se mantiene el mapeo volumen arriba = anterior y volumen abajo = siguiente porque coincide con
+el orden visual de la pantalla. No se usa un `AccessibilityService` para el botón de encendido:
+habría que activarlo a mano en los ajustes de accesibilidad, no es fiable entre fabricantes y
+supondría un servicio permanente en segundo plano; el modo queda contenido dentro de la app.
+
+## 7. Privacidad: funciona sin internet
+
+- El permiso de **INTERNET está eliminado** del manifiesto, igual que los permisos de red y
+  servicios en segundo plano que arrastran algunas librerías.
+- No hay analítica, telemetría, publicidad ni cuentas de usuario.
+- Los fotogramas de la cámara se procesan **en memoria** y se descartan; no se guardan ni se
+  envían.
+- Lo único que se guarda en el teléfono son los ajustes (voz, vibración, señal y navegación).
+
+## 8. Requisitos
+
+- **Android 8.0 o superior** (`minSdk 26`).
+- **Cámara** (la app se instala aunque el teléfono no tenga, y avisa por voz y en pantalla).
+- **Voz en español** instalada en el sistema. Si no hay motor de voz, la app lo avisa y sigue
+  mostrando los resultados en pantalla.
+- La vibración es opcional.
+
+## 9. Mapa del proyecto
+
+Para entender la app no hace falta leer todo el código; esta es la función de cada carpeta:
+
+```
+app/src/main/
+├── assets/
+│   ├── best.tflite              Modelo de detección incluido en la app
+│   └── labels.txt               Nombres de las clases, en el orden del modelo
+├── java/com/example/reconocedordinero/
+│   ├── MainActivity.kt          Pantallas, navegación, botones físicos y toques
+│   ├── ReconocedorApp.kt        Crea una sola vez voz, vibración, pitido, modelo y cursor
+│   ├── audio/
+│   │   ├── SpeechManager.kt     Voz (TextToSpeech), velocidad y volumen
+│   │   ├── HapticManager.kt     Patrones de vibración (paso, inicio, éxito, error)
+│   │   └── BeepPlayer.kt        Pitido mientras se detecta dinero
+│   ├── data/
+│   │   └── SettingsRepository.kt  Ajustes guardados con DataStore
+│   ├── domain/
+│   │   ├── ScanResult.kt        Resultado: conteo por pieza y total en céntimos
+│   │   ├── MoneyFormatter.kt    Montos en texto y frases habladas en español
+│   │   └── StabilityFilter.kt   Decide cuándo un conteo es estable
+│   ├── ml/
+│   │   └── ModelRunner.kt       Carga best.tflite y ejecuta la detección
+│   └── ui/
+│       ├── accessibility/
+│       │   └── CursorController.kt  Cursor virtual y resaltado de elementos
+│       ├── components/
+│       │   └── ScreenTopBar.kt  Barra superior con flecha atrás y título
+│       ├── home/                Pantalla de inicio
+│       ├── scan/                Cámara, análisis y recuadros de detección
+│       ├── result/              Monto total y detalle
+│       ├── settings/            Ajustes y su ViewModel
+│       ├── help/                Instrucciones escritas y habladas
+│       └── theme/               Colores, tipografía y tema Material 3
+├── res/values/strings.xml       Todos los textos en español
+└── res/xml/                     Reglas de copia de seguridad
+
+app/src/test/                    Pruebas unitarias (filtro de estabilidad, formato de dinero y cursor)
+```
+
+## 10. Abrir y compilar
 
 1. Abrir la carpeta del proyecto en Android Studio (versión reciente; el proyecto usa
    AGP 9.2.1 y Gradle 9.4.1 con Kotlin integrado).
@@ -13,9 +205,16 @@ señal sonora. Funciona 100% sin internet.
 3. Compilar: `./gradlew assembleDebug` (o el botón *Run* de Android Studio).
 4. Pruebas unitarias: `./gradlew test`.
 
-En línea de comandos hace falta un JDK 17+ en `JAVA_HOME`. Android Studio ya trae uno.
+En Windows usa `gradlew.bat` en lugar de `./gradlew`. En línea de comandos hace falta un
+JDK 17 o superior en `JAVA_HOME`; Android Studio ya trae uno.
 
-## 2. El modelo `best.tflite`
+Las pruebas unitarias cubren:
+
+- `StabilityFilterTest`: cuándo un conteo se considera estable.
+- `MoneyFormatterTest`: montos, singular/plural y frases habladas.
+- `CursorControllerTest`: avance circular, modo ajuste y reinicio al cambiar de pantalla.
+
+## 11. El modelo `best.tflite`
 
 El modelo **ya está incluido** en `app/src/main/assets/best.tflite` en este repositorio.
 
@@ -41,10 +240,11 @@ m50
 rev
 ```
 
-Si el modelo falta o no se puede abrir, la app **no se cierra**: dice por voz
-«No se pudo iniciar el reconocimiento» y lo muestra en pantalla.
+`rev` se detecta pero se ignora al contar. Si el modelo falta o no se puede abrir, la
+app **no se cierra**: dice por voz «No se pudo iniciar el reconocimiento» y lo muestra en
+pantalla.
 
-## 3. Instalar en un teléfono real
+## 12. Instalar en un teléfono real
 
 1. Activar *Opciones de desarrollador* y *Depuración USB* en el teléfono.
 2. Conectarlo por USB y aceptar la huella de depuración.
@@ -54,7 +254,11 @@ Si el modelo falta o no se puede abrir, la app **no se cierra**: dice por voz
 Para probar sin mirar la pantalla, activar TalkBack en el teléfono. La app está pensada para
 usarse con toques simples.
 
-## 4. Logcat
+Si al instalar aparece `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, el teléfono tiene una versión
+anterior firmada con otra clave: hay que **desinstalarla primero** (se pierden los ajustes
+guardados) y luego instalar la nueva.
+
+## 13. Logcat
 
 Filtrar por la etiqueta `ModelRunner`. Al arrancar el reconocimiento imprime las formas reales
 del modelo:
@@ -68,9 +272,9 @@ La salida esperada es `[1, 15, 8400]`; la entrada puede ser `[1, 3, 640, 640]` o
 coordenadas vienen normalizadas.
 
 Otras etiquetas útiles: `AppContainer` (fallo al cargar el modelo), `SpeechManager` (motor de
-voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia).
+voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia) y `ButtonNavigation` (pasos del cursor).
 
-## 5. Decisiones ante ambigüedades
+## 14. Decisiones ante ambigüedades
 
 - **LiteRT y el import de `Interpreter`.** La dependencia es
   `com.google.ai.edge.litert:litert:2.3.0` (Google Maven), como pide el enunciado. En esa
@@ -100,18 +304,19 @@ voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia).
 - **Pruebas de plantilla** (`ExampleUnitTest.java` / `ExampleInstrumentedTest.java`, del paquete
   `com.example.truegem`) se eliminaron porque no correspondían a este proyecto.
 
-## 6. Accesibilidad
+## 15. Problemas frecuentes
 
-- Todo el texto está en `strings.xml` (español).
-- Títulos como `heading`, botones con `contentDescription`, orden de foco lógico y overlay
-  decorativo invisible para TalkBack.
-- El layout respeta `fontScale` alto (hasta 200 %) con scroll vertical en Resultado, Ajustes y
-  Ayuda.
-- Los sliders exponen `stateDescription` («1,2 veces», «80 por ciento»).
-- La cámara se libera al salir, rotar o pasar a segundo plano. La pantalla permanece encendida
-  solo durante el escaneo.
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| No reconoce nada y vuelve al inicio | Poca luz, piezas juntas o demasiada distancia | Buena luz, separar las piezas y mantener el teléfono a unos 30 cm y quieto. |
+| Dice «No se pudo iniciar el reconocimiento» | Falta `best.tflite` o `labels.txt` está mal | Revisar `app/src/main/assets/` y el orden de las clases. |
+| No habla | No hay voz en español instalada, o el volumen de voz está a 0 | Instalar una voz en español y subir «Volumen de voz» en Ajustes. |
+| Los botones de volumen no navegan | Modo desactivado, TalkBack activo o pantalla sin elementos | Activar «Navegación con botones» en Ajustes y desactivar TalkBack. |
+| El botón de encendido no navega | Limitación de Android | Usar los botones de volumen; el sistema consume el botón de encendido. |
+| Aparece un borde amarillo | Es el cursor de la navegación por botones | Normal; se oculta al desactivar el modo en Ajustes. |
+| No instala la nueva versión | Firma distinta de la app instalada | Desinstalar la versión anterior e instalar de nuevo. |
 
-## 7. Fuera de alcance (v2)
+## 16. Fuera de alcance (v2)
 
 Linterna automática, detección de imagen borrosa, delegado GPU, modo claro, otros idiomas,
 detección de piezas de 5 céntimos o billetes de 200 soles (el modelo no tiene esas clases).

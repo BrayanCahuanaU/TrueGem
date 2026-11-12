@@ -32,6 +32,9 @@ class HapticManager(context: Context, private val enabled: () -> Boolean) {
         v.vibrate(VibrationEffect.createWaveform(timings, -1))
     }
 
+    /** Paso del cursor con los botones físicos: vibración muy corta. */
+    fun tick() = oneShot(20)
+
     /** Inicio de escaneo: una vibración corta. */
     fun start() = oneShot(60)
 

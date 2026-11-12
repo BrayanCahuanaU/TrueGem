@@ -8,6 +8,7 @@ import com.example.reconocedordinero.audio.SpeechManager
 import com.example.reconocedordinero.data.SettingsRepository
 import com.example.reconocedordinero.domain.ScanResult
 import com.example.reconocedordinero.ml.ModelRunner
+import com.example.reconocedordinero.ui.accessibility.CursorController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,6 +54,9 @@ class AppContainer(val context: Application) {
     /** Resultado del último escaneo, compartido entre pantallas (no por argumentos de navegación). */
     private val _result = MutableStateFlow<ScanResult?>(null)
     val result: StateFlow<ScanResult?> = _result.asStateFlow()
+
+    /** Cursor compartido para la navegación con los botones físicos. */
+    val cursor = CursorController()
 
     fun publishResult(result: ScanResult) {
         _result.value = result

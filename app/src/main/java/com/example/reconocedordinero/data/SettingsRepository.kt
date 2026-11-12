@@ -21,6 +21,7 @@ data class AppSettings(
     val voiceVolume: Int = 80,
     val vibration: Boolean = true,
     val beep: Boolean = true,
+    val buttonNavigation: Boolean = true,
 )
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -33,6 +34,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val VOICE_VOLUME = intPreferencesKey("voice_volume")
         val VIBRATION = booleanPreferencesKey("vibration")
         val BEEP = booleanPreferencesKey("beep")
+        val BUTTON_NAVIGATION = booleanPreferencesKey("button_navigation")
     }
 
     private val appContext = context.applicationContext
@@ -47,6 +49,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         voiceVolume = this[VOICE_VOLUME] ?: 80,
         vibration = this[VIBRATION] ?: true,
         beep = this[BEEP] ?: true,
+        buttonNavigation = this[BUTTON_NAVIGATION] ?: true,
     )
 
     suspend fun setVoiceRate(value: Float) {
@@ -63,5 +66,9 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
 
     suspend fun setBeep(value: Boolean) {
         appContext.dataStore.edit { it[BEEP] = value }
+    }
+
+    suspend fun setButtonNavigation(value: Boolean) {
+        appContext.dataStore.edit { it[BUTTON_NAVIGATION] = value }
     }
 }

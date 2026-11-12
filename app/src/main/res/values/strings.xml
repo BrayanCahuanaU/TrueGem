@@ -41,6 +41,28 @@
     <string name="settings_beep">Señal sonora</string>
     <string name="settings_test_voice">Probar voz</string>
     <string name="settings_test_phrase">Total: 35 soles. Un billete de 20 soles, un billete de 10 soles, una moneda de 5 soles.</string>
+    <string name="settings_voice_rate_value">%1$s veces</string>
+    <string name="settings_voice_volume_value">%1$d por ciento</string>
+    <string name="settings_button_navigation">Navegación con botones</string>
+    <string name="settings_button_navigation_help">Subir y bajar volumen mueven el cursor. Un toque selecciona y dos toques retroceden.</string>
+    <string name="settings_vibration_on">Vibración activada</string>
+    <string name="settings_vibration_off">Vibración desactivada</string>
+    <string name="settings_beep_on">Señal sonora activada</string>
+    <string name="settings_beep_off">Señal sonora desactivada</string>
+    <string name="settings_button_navigation_on">Navegación con botones activada</string>
+    <string name="settings_button_navigation_off">Navegación con botones desactivada</string>
+
+    <!-- Navegación con botones físicos -->
+    <string name="cursor_position">%1$s. %2$d de %3$d</string>
+    <string name="cursor_position_value">%1$s: %2$s. %3$d de %4$d</string>
+    <string name="cursor_adjust_mode">Modo ajuste. %1$s. Use subir y bajar volumen.</string>
+    <string name="cursor_adjust_mode_value">Modo ajuste. %1$s: %2$s. Use subir y bajar volumen.</string>
+    <string name="cursor_adjust_value">%1$s: %2$s</string>
+    <string name="cursor_adjust_end">Ajuste terminado. %1$s</string>
+    <string name="cursor_back">Atrás</string>
+    <string name="cursor_home">Inicio</string>
+    <string name="switch_on">activada</string>
+    <string name="switch_off">desactivada</string>
 
     <!-- Ayuda -->
     <string name="help_title">Ayuda</string>
