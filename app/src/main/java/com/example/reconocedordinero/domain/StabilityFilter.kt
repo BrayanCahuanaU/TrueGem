@@ -1,7 +1,7 @@
 package com.example.reconocedordinero.domain
 
 /**
- * Filtro de estabilidad: guarda el conteo por etiqueta (ignorando `rev`) de los últimos
+ * Filtro de estabilidad: guarda el conteo por etiqueta (ignorando las que no son dinero) de los últimos
  * [window] frames. Es estable cuando el mismo conteo, con al menos una pieza, aparece en
  * [needed] o más de esos frames. Devuelve el conteo ganador. Se reinicia al empezar un escaneo.
  */

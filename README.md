@@ -280,12 +280,27 @@ m2
 m20
 m5
 m50
-rev
 ```
 
-`rev` se detecta pero se ignora al contar. Si el modelo falta o no se puede abrir, la
-app **no se cierra**: dice por voz «No se pudo iniciar el reconocimiento» y lo muestra en
-pantalla.
+Son **10 clases**: los billetes y las seis monedas. La antigua clase `rev` desapareció porque los
+reversos de moneda ahora están etiquetados con su denominación real (ver
+`PLAN_MEJORA_MONEDAS.md`). Si el modelo falta o no se puede abrir, la app **no se cierra**: dice por
+voz «No se pudo iniciar el reconocimiento» y lo muestra en pantalla.
+
+### Versión actual del modelo
+
+| Dato | Valor |
+|---|---|
+| Arquitectura | YOLOv8s, 11.129.454 parámetros |
+| Entrada | 640 × 640 × 3 (float32, NHWC) |
+| Salida | `[1, 14, 8400]` (4 coordenadas + 10 clases) |
+| Clases | 10, sin `rev` |
+| Entrenamiento | dataset público PeruvianCash con etiquetas corregidas y monedas sobremuestreadas |
+| Test (370 imágenes no vistas) | Precision 0,980 · Recall 0,984 · mAP50 0,991 · mAP50-95 0,860 |
+| Confusiones entre monedas | 0 (diagonal 1,00 en la matriz de confusión) |
+
+`ModelRunner` lee la forma real del tensor, así que acepta tanto `[1, 3, 640, 640]` como
+`[1, 640, 640, 3]` de entrada, y tanto `[1, 4+nc, N]` como `[1, N, 4+nc]` de salida.
 
 ## 12. Instalar en un teléfono real
 
@@ -307,12 +322,12 @@ Filtrar por la etiqueta `ModelRunner`. Al arrancar el reconocimiento imprime las
 del modelo y el tamaño de entrada que va a usar:
 
 ```
-ModelRunner: in=[1, 3, 640, 640] out=[1, 15, 8400] entrada=640x640
+ModelRunner: in=[1, 640, 640, 3] out=[1, 14, 8400] entrada=640x640
 ```
 
-La salida esperada es `[1, 15, 8400]`; la entrada puede ser `[1, 3, 640, 640]` o
-`[1, 640, 640, 3]`. `ModelRunner` detecta automáticamente el orden de canales, el tamaño de
-entrada y si las coordenadas vienen normalizadas.
+La salida esperada es `[1, 14, 8400]` (4 coordenadas + 10 clases); la entrada puede ser
+`[1, 3, 640, 640]` o `[1, 640, 640, 3]`. `ModelRunner` detecta automáticamente el orden de canales,
+el tamaño de entrada y si las coordenadas vienen normalizadas.
 
 Para ver **cada detección** (clase, confianza, segunda clase, margen y caja) hay que habilitar
 el nivel DEBUG de la etiqueta en el teléfono:
@@ -341,11 +356,12 @@ voz), `ScanScreen`/`ScanViewModel` (cámara e inferencia), `ButtonNavigation` (p
 
 ## 14. Modo de captura para mejorar el modelo
 
-El modelo incluido reconoce bien los billetes, pero confunde algunas monedas porque el dataset
-público con el que se entrenó tiene **muchas menos monedas que billetes** (ver
-`PLAN_MEJORA_MONEDAS.md`). Para mejorarlo hacen falta fotos reales del teléfono. La app incluye un
-modo de captura que guarda los fotogramas que analiza, **solo en compilaciones de depuración** y
-**sin enviar nada a internet**.
+El modelo incluido reconoce bien los billetes y, desde el reentrenamiento del 12/11/2026, también
+las seis monedas (0 confusiones entre denominaciones en el test del dataset). Aun así, el dataset
+público con el que se entrenó tiene **pocas monedas y en fondos limpios**, así que la escena real
+(mesa, mano, luz cálida, varias piezas) sigue siendo el punto débil. Para mejorarlo hacen falta
+fotos reales del teléfono. La app incluye un modo de captura que guarda los fotogramas que analiza,
+**solo en compilaciones de depuración** y **sin enviar nada a internet**.
 
 ### 14.1 Activar el modo
 
@@ -448,7 +464,7 @@ automáticamente.
 |---|---|---|
 | No reconoce nada y vuelve al inicio | Poca luz, piezas juntas o demasiada distancia | Buena luz, separar las piezas y mantener el teléfono a unos 30 cm y quieto. |
 | Dice «No pude reconocer una moneda con seguridad» | El modelo duda entre dos denominaciones parecidas | Es intencionado: la moneda no se cuenta para no dar un total equivocado. Separar las monedas, acercarse y repetir. |
-| Confunde siempre la misma moneda (p. ej. 20 céntimos → 50 céntimos) | El dataset tiene muy pocas monedas comparado con los billetes y el modelo tiende a la clase más frecuente | Es un límite del modelo, no de los umbrales. Capturar imágenes reales con el modo de captura (sección [14](#14-modo-de-captura-para-mejorar-el-modelo)) y reentrenar. |
+| Confunde siempre la misma moneda (p. ej. 20 céntimos → 50 céntimos) | El modelo es bueno con el dataset, pero la escena real (fondo, luz, ángulo) no se parece a las fotos de entrenamiento | Capturar imágenes reales con el modo de captura (sección [14](#14-modo-de-captura-para-mejorar-el-modelo)) y reentrenar. Subir el umbral de esa clase no arregla el sesgo. |
 | Dice «No se pudo iniciar el reconocimiento» | Falta `best.tflite` o `labels.txt` está mal | Revisar `app/src/main/assets/` y el orden de las clases. |
 | No habla | No hay voz en español instalada, o el volumen de voz está a 0 | Instalar una voz en español y subir «Volumen de voz» en Ajustes. |
 | Los botones de volumen no navegan | Modo desactivado, TalkBack activo o pantalla sin elementos | Activar «Navegación con botones» en Ajustes y desactivar TalkBack. |

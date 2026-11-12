@@ -7,7 +7,7 @@ import java.util.Locale
  */
 object MoneyFormatter {
 
-    /** Valor en céntimos de cada etiqueta del modelo (etiquetas fuera del mapa, como `rev`, se ignoran). */
+    /** Valor en céntimos de cada etiqueta del modelo (las etiquetas fuera del mapa se ignoran). */
     // TODO v2: piezas de 5 céntimos y billetes de 200 soles (el modelo no tiene esas clases).
     private val VALOR = mapOf(
         "100-soles" to 10000, "50-soles" to 5000, "20-soles" to 2000, "10-soles" to 1000,
@@ -27,7 +27,7 @@ object MoneyFormatter {
     /** Valor en céntimos de una etiqueta, o 0 si no se reconoce. */
     fun valueCents(label: String): Int = VALOR[label] ?: 0
 
-    /** `true` si la etiqueta cuenta para el total (excluye `rev` y desconocidas). */
+    /** `true` si la etiqueta cuenta para el total (excluye las desconocidas). */
     fun isMoney(label: String): Boolean = label in VALOR
 
     /** Texto en pantalla del monto total: `S/ 35,00` (coma decimal, siempre dos decimales). */

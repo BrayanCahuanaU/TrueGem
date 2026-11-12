@@ -41,7 +41,7 @@ internal data class Top2(val cls: Int, val score: Float, val second: Float) {
     val margin: Float get() = score - second
 }
 
-/** Clase ganadora y segunda de un vector de probabilidades (incluye billetes y `rev`). */
+/** Clase ganadora y segunda de un vector de probabilidades (incluye billetes y desconocidas). */
 internal fun top2(probs: FloatArray): Top2 {
     var best = 0
     var score = 0f
@@ -73,7 +73,7 @@ internal fun mezclarProbabilidades(
     return FloatArray(completa.size) { pesoCompleta * completa[it] + pesoRecorte * recorte[it] }
 }
 
-/** Valores en céntimos para evitar errores de coma flotante. Etiquetas fuera del mapa (ej. "rev") se ignoran. */
+/** Valores en céntimos para evitar errores de coma flotante. Las etiquetas fuera del mapa se ignoran. */
 object Dinero {
     val CENTIMOS = mapOf(
         "10-soles" to 1000, "20-soles" to 2000, "50-soles" to 5000, "100-soles" to 10000,
@@ -475,7 +475,7 @@ class ModelRunner(context: Context, modelName: String = "best.tflite") {
         return salida
     }
 
-    /** Clase de moneda ganadora y segunda, ignorando billetes y `rev`. */
+    /** Clase de moneda ganadora y segunda, ignorando billetes y etiquetas desconocidas. */
     private fun top2Moneda(probs: FloatArray): Top2 {
         var best = -1
         var score = 0f
